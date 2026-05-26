@@ -1,0 +1,684 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+ 
+/* ── Constants ─────────────────────────────────────────── */
+#define FILE_NAME     "students.dat"
+#define MAX_NAME      60
+#define MAX_DEPT      40
+#define MAX_EMAIL     60
+#define MAX_PHONE     16
+#define MAX_STUDENTS  1000
+#define VERSION       "v2.0"
+ 
+/* ── ANSI Color Codes ───────────────────────────────────── */
+#define RESET   "\033[0m"
+#define BOLD    "\033[1m"
+#define DIM     "\033[2m"
+#define RED     "\033[31m"
+#define GREEN   "\033[32m"
+#define YELLOW  "\033[33m"
+#define BLUE    "\033[34m"
+#define MAGENTA "\033[35m"
+#define CYAN    "\033[36m"
+#define WHITE   "\033[37m"
+#define BG_BLUE "\033[44m"
+#define BG_CYAN "\033[46m"
+ 
+/* ── Student Structure ──────────────────────────────────── */
+typedef struct {
+    int    roll_no;
+    char   name[MAX_NAME];
+    char   department[MAX_DEPT];
+    int    semester;
+    float  cgpa;
+    char   phone[MAX_PHONE];
+    char   email[MAX_EMAIL];
+    int    year_of_admission;
+} Student;
+ 
+/* ── Function Prototypes ────────────────────────────────── */
+void  clear_screen(void);
+void  print_banner(void);
+void  print_menu(void);
+void  print_separator(const char *title, char ch, int width);
+void  print_student_header(void);
+void  print_student_row(const Student *s, int serial);
+void  flush_input(void);
+int   validate_cgpa(float cgpa);
+int   validate_semester(int sem);
+int   validate_roll(int roll);
+int   roll_exists(int roll);
+int   get_total_count(void);
+ 
+void  add_student(void);
+void  display_all(void);
+void  search_student(void);
+void  update_student(void);
+void  delete_student(void);
+void  display_statistics(void);
+void  sort_and_display(void);
+void  export_report(void);
+ 
+/* ═══════════════════════════════════════════════════════════
+   UTILITY FUNCTIONS
+═══════════════════════════════════════════════════════════ */
+ 
+void clear_screen(void) {
+#ifdef _WIN32
+    system("cls");
+#else
+    system("clear");
+#endif
+}
+ 
+void flush_input(void) {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+}
+ 
+void print_separator(const char *title, char ch, int width) {
+    int title_len = (int)strlen(title);
+    int pad = (width - title_len - 2) / 2;
+    printf(CYAN);
+    for (int i = 0; i < pad; i++) putchar(ch);
+    printf(BOLD WHITE " %s " RESET CYAN, title);
+    for (int i = 0; i < pad; i++) putchar(ch);
+    printf(RESET "\n");
+}
+ 
+void print_banner(void) {
+    clear_screen();
+    printf(CYAN BOLD);
+    printf("╔══════════════════════════════════════════════════════════════╗\n");
+    printf("║                                                              ║\n");
+    printf("║          ███████╗████████╗██╗   ██╗██████╗ ██╗             ║\n");
+    printf("║          ██╔════╝╚══██╔══╝██║   ██║██╔══██╗██║             ║\n");
+    printf("║          ███████╗   ██║   ██║   ██║██║  ██║██║             ║\n");
+    printf("║          ╚════██║   ██║   ██║   ██║██║  ██║██║             ║\n");
+    printf("║          ███████║   ██║   ╚██████╔╝██████╔╝███████╗        ║\n");
+    printf("║          ╚══════╝   ╚═╝    ╚═════╝ ╚═════╝ ╚══════╝        ║\n");
+    printf("║                                                              ║\n");
+    printf("║" YELLOW "         STUDENT MANAGEMENT SYSTEM  " CYAN VERSION "              " CYAN "║\n");
+    printf("║" DIM WHITE "              Built in C · File-Persistent Data               " CYAN "║\n");
+    printf("╚══════════════════════════════════════════════════════════════╝\n");
+    printf(RESET);
+}
+ 
+void print_menu(void) {
+    int count = get_total_count();
+    printf("\n");
+    printf(CYAN "┌─────────────────────────────────────────────┐\n");
+    printf("│" BOLD YELLOW "              MAIN  MENU                    " CYAN " │\n");
+    printf("│" DIM WHITE "         Total Records: %-4d                " CYAN " │\n", count);
+    printf("├─────────────────────────────────────────────┤\n");
+    printf("│  " GREEN "1." RESET "  ➕  Add New Student                    " CYAN "│\n");
+    printf("│  " GREEN "2." RESET "  📋  Display All Students               " CYAN "│\n");
+    printf("│  " GREEN "3." RESET "  🔍  Search Student                     " CYAN "│\n");
+    printf("│  " GREEN "4." RESET "  ✏️   Update Student Record              " CYAN "│\n");
+    printf("│  " GREEN "5." RESET "  🗑️   Delete Student Record              " CYAN "│\n");
+    printf("│  " GREEN "6." RESET "  📊  Statistics & Analytics             " CYAN "│\n");
+    printf("│  " GREEN "7." RESET "  📑  Sort & Display                     " CYAN "│\n");
+    printf("│  " GREEN "8." RESET "  📤  Export Text Report                 " CYAN "│\n");
+    printf("├─────────────────────────────────────────────┤\n");
+    printf("│  " RED "0." RESET "  🚪  Exit System                        " CYAN "│\n");
+    printf("└─────────────────────────────────────────────┘\n" RESET);
+    printf(BOLD "  Enter choice: " RESET);
+}
+ 
+void print_student_header(void) {
+    printf(CYAN BOLD);
+    printf("┌──────┬──────────────────────────┬────────────────┬──────┬──────┬─────────────┐\n");
+    printf("│ S.No │ Name                     │ Department     │ Sem  │ CGPA │ Roll No     │\n");
+    printf("├──────┼──────────────────────────┼────────────────┼──────┼──────┼─────────────┤\n");
+    printf(RESET);
+}
+ 
+void print_student_row(const Student *s, int serial) {
+    char grade_color[20];
+    if      (s->cgpa >= 9.0f) strcpy(grade_color, GREEN BOLD);
+    else if (s->cgpa >= 7.5f) strcpy(grade_color, GREEN "");
+    else if (s->cgpa >= 6.0f) strcpy(grade_color, YELLOW "");
+    else                       strcpy(grade_color, RED "");
+ 
+    printf(CYAN "│" RESET " %-4d " CYAN "│" RESET " %-24.24s " CYAN "│" RESET
+           " %-14.14s " CYAN "│" RESET "  %d   " CYAN "│" RESET " %s%.2f" RESET
+           " " CYAN "│" RESET " %-11d " CYAN "│\n" RESET,
+           serial, s->name, s->department, s->semester,
+           grade_color, s->cgpa, s->roll_no);
+}
+ 
+int validate_cgpa(float cgpa)     { return (cgpa >= 0.0f && cgpa <= 10.0f); }
+int validate_semester(int sem)    { return (sem >= 1 && sem <= 8); }
+int validate_roll(int roll)       { return (roll > 0 && roll <= 999999); }
+ 
+int roll_exists(int roll) {
+    FILE *fp = fopen(FILE_NAME, "rb");
+    if (!fp) return 0;
+    Student s;
+    while (fread(&s, sizeof(Student), 1, fp) == 1)
+        if (s.roll_no == roll) { fclose(fp); return 1; }
+    fclose(fp);
+    return 0;
+}
+ 
+int get_total_count(void) {
+    FILE *fp = fopen(FILE_NAME, "rb");
+    if (!fp) return 0;
+    fseek(fp, 0, SEEK_END);
+    long sz = ftell(fp);
+    fclose(fp);
+    return (int)(sz / sizeof(Student));
+}
+ 
+/* ═══════════════════════════════════════════════════════════
+   1. ADD STUDENT
+═══════════════════════════════════════════════════════════ */
+void add_student(void) {
+    clear_screen();
+    print_separator("ADD NEW STUDENT", '=', 62);
+ 
+    Student s;
+    memset(&s, 0, sizeof(Student));
+ 
+    /* Roll Number */
+    do {
+        printf(CYAN "  ↳ Roll Number   : " RESET);
+        if (scanf("%d", &s.roll_no) != 1) { flush_input(); s.roll_no = -1; continue; }
+        flush_input();
+        if (!validate_roll(s.roll_no))
+            printf(RED "    ✗ Invalid roll number (1–999999)\n" RESET);
+        else if (roll_exists(s.roll_no))
+            printf(RED "    ✗ Roll %d already exists!\n" RESET, s.roll_no);
+    } while (!validate_roll(s.roll_no) || roll_exists(s.roll_no));
+ 
+    /* Name */
+    printf(CYAN "  ↳ Full Name      : " RESET);
+    fgets(s.name, MAX_NAME, stdin);
+    s.name[strcspn(s.name, "\n")] = '\0';
+ 
+    /* Department */
+    printf(CYAN "  ↳ Department     : " RESET);
+    fgets(s.department, MAX_DEPT, stdin);
+    s.department[strcspn(s.department, "\n")] = '\0';
+ 
+    /* Semester */
+    do {
+        printf(CYAN "  ↳ Semester (1-8) : " RESET);
+        if (scanf("%d", &s.semester) != 1) { flush_input(); s.semester = 0; }
+        else flush_input();
+        if (!validate_semester(s.semester))
+            printf(RED "    ✗ Semester must be 1–8\n" RESET);
+    } while (!validate_semester(s.semester));
+ 
+    /* CGPA */
+    do {
+        printf(CYAN "  ↳ CGPA (0–10)   : " RESET);
+        if (scanf("%f", &s.cgpa) != 1) { flush_input(); s.cgpa = -1; }
+        else flush_input();
+        if (!validate_cgpa(s.cgpa))
+            printf(RED "    ✗ CGPA must be 0.00–10.00\n" RESET);
+    } while (!validate_cgpa(s.cgpa));
+ 
+    /* Phone */
+    printf(CYAN "  ↳ Phone Number   : " RESET);
+    fgets(s.phone, MAX_PHONE, stdin);
+    s.phone[strcspn(s.phone, "\n")] = '\0';
+ 
+    /* Email */
+    printf(CYAN "  ↳ Email Address  : " RESET);
+    fgets(s.email, MAX_EMAIL, stdin);
+    s.email[strcspn(s.email, "\n")] = '\0';
+ 
+    /* Year of Admission */
+    printf(CYAN "  ↳ Year of Admsn  : " RESET);
+    if (scanf("%d", &s.year_of_admission) != 1) s.year_of_admission = 2024;
+    flush_input();
+ 
+    /* Write to file */
+    FILE *fp = fopen(FILE_NAME, "ab");
+    if (!fp) { printf(RED "\n  ✗ Error: Cannot open file!\n" RESET); return; }
+    fwrite(&s, sizeof(Student), 1, fp);
+    fclose(fp);
+ 
+    printf(GREEN BOLD "\n  ✔ Student '%s' (Roll: %d) added successfully!\n" RESET,
+           s.name, s.roll_no);
+    printf("  Press Enter to continue...");
+    flush_input();
+}
+ 
+/* ═══════════════════════════════════════════════════════════
+   2. DISPLAY ALL
+═══════════════════════════════════════════════════════════ */
+void display_all(void) {
+    clear_screen();
+    print_separator("ALL STUDENT RECORDS", '=', 62);
+ 
+    FILE *fp = fopen(FILE_NAME, "rb");
+    if (!fp) { printf(YELLOW "\n  ⚠ No records found. File doesn't exist yet.\n" RESET); goto wait; }
+ 
+    Student s;
+    int count = 0;
+    print_student_header();
+    while (fread(&s, sizeof(Student), 1, fp) == 1) {
+        count++;
+        print_student_row(&s, count);
+    }
+    printf(CYAN "└──────┴──────────────────────────┴────────────────┴──────┴──────┴─────────────┘\n" RESET);
+    fclose(fp);
+ 
+    if (count == 0) printf(YELLOW "\n  ⚠ No records found.\n" RESET);
+    else            printf(GREEN "\n  Total: %d student(s)\n" RESET, count);
+ 
+wait:
+    printf("\n  Press Enter to continue...");
+    flush_input();
+}
+ 
+/* ═══════════════════════════════════════════════════════════
+   3. SEARCH STUDENT
+═══════════════════════════════════════════════════════════ */
+void search_student(void) {
+    clear_screen();
+    print_separator("SEARCH STUDENT", '=', 62);
+ 
+    printf("\n  Search by:\n");
+    printf("  " GREEN "1." RESET " Roll Number\n");
+    printf("  " GREEN "2." RESET " Name (partial match)\n");
+    printf("  " GREEN "3." RESET " Department\n");
+    printf("  Choice: ");
+ 
+    int choice;
+    if (scanf("%d", &choice) != 1) { flush_input(); return; }
+    flush_input();
+ 
+    FILE *fp = fopen(FILE_NAME, "rb");
+    if (!fp) { printf(YELLOW "\n  ⚠ No records found.\n" RESET); goto wait; }
+ 
+    Student s;
+    int found = 0;
+ 
+    if (choice == 1) {
+        int roll;
+        printf("  Roll Number: ");
+        scanf("%d", &roll); flush_input();
+        print_student_header();
+        while (fread(&s, sizeof(Student), 1, fp) == 1) {
+            if (s.roll_no == roll) {
+                found++;
+                print_student_row(&s, found);
+                /* Detail view */
+                printf(CYAN "├──────────────────────────────────────────────────────────────────────┤\n");
+                printf("│" RESET " Phone  : %-20s  Email: %-24s " CYAN "│\n", s.phone, s.email);
+                printf("│" RESET " Year of Admission: %-4d                                            " CYAN "│\n", s.year_of_admission);
+                printf("└──────────────────────────────────────────────────────────────────────┘\n" RESET);
+            }
+        }
+    } else if (choice == 2) {
+        char keyword[MAX_NAME];
+        printf("  Name keyword: ");
+        fgets(keyword, MAX_NAME, stdin);
+        keyword[strcspn(keyword, "\n")] = '\0';
+        /* lowercase */
+        for (int i = 0; keyword[i]; i++) keyword[i] = (char)tolower(keyword[i]);
+        print_student_header();
+        while (fread(&s, sizeof(Student), 1, fp) == 1) {
+            char low[MAX_NAME];
+            strncpy(low, s.name, MAX_NAME);
+            for (int i = 0; low[i]; i++) low[i] = (char)tolower(low[i]);
+            if (strstr(low, keyword)) { found++; print_student_row(&s, found); }
+        }
+        printf(CYAN "└──────┴──────────────────────────┴────────────────┴──────┴──────┴─────────────┘\n" RESET);
+    } else if (choice == 3) {
+        char dept[MAX_DEPT];
+        printf("  Department: ");
+        fgets(dept, MAX_DEPT, stdin);
+        dept[strcspn(dept, "\n")] = '\0';
+        char ldept[MAX_DEPT];
+        strncpy(ldept, dept, MAX_DEPT);
+        for (int i = 0; ldept[i]; i++) ldept[i] = (char)tolower(ldept[i]);
+        print_student_header();
+        while (fread(&s, sizeof(Student), 1, fp) == 1) {
+            char low[MAX_DEPT];
+            strncpy(low, s.department, MAX_DEPT);
+            for (int i = 0; low[i]; i++) low[i] = (char)tolower(low[i]);
+            if (strstr(low, ldept)) { found++; print_student_row(&s, found); }
+        }
+        printf(CYAN "└──────┴──────────────────────────┴────────────────┴──────┴──────┴─────────────┘\n" RESET);
+    }
+ 
+    fclose(fp);
+    if (found == 0) printf(YELLOW "\n  ⚠ No matching records found.\n" RESET);
+    else            printf(GREEN "\n  Found: %d record(s).\n" RESET, found);
+ 
+wait:
+    printf("\n  Press Enter to continue...");
+    flush_input();
+}
+ 
+/* ═══════════════════════════════════════════════════════════
+   4. UPDATE STUDENT
+═══════════════════════════════════════════════════════════ */
+void update_student(void) {
+    clear_screen();
+    print_separator("UPDATE STUDENT RECORD", '=', 62);
+ 
+    int roll;
+    printf("\n  Enter Roll Number to update: ");
+    if (scanf("%d", &roll) != 1) { flush_input(); return; }
+    flush_input();
+ 
+    FILE *fp = fopen(FILE_NAME, "r+b");
+    if (!fp) { printf(YELLOW "\n  ⚠ No records found.\n" RESET); goto wait; }
+ 
+    Student s;
+    long pos = -1;
+    while (fread(&s, sizeof(Student), 1, fp) == 1) {
+        if (s.roll_no == roll) { pos = ftell(fp) - (long)sizeof(Student); break; }
+    }
+ 
+    if (pos == -1) {
+        printf(YELLOW "\n  ⚠ Roll No. %d not found.\n" RESET, roll);
+        fclose(fp);
+        goto wait;
+    }
+ 
+    printf(GREEN "\n  Found: %s (Roll: %d)\n" RESET, s.name, s.roll_no);
+    printf("  What to update?\n");
+    printf("  " GREEN "1" RESET " Name  " GREEN "2" RESET " Department  "
+           GREEN "3" RESET " Semester  " GREEN "4" RESET " CGPA  "
+           GREEN "5" RESET " Phone  " GREEN "6" RESET " Email  "
+           GREEN "7" RESET " All Fields\n");
+    printf("  Choice: ");
+ 
+    int ch;
+    if (scanf("%d", &ch) != 1) { flush_input(); fclose(fp); return; }
+    flush_input();
+ 
+    switch (ch) {
+        case 1:
+            printf("  New Name: "); fgets(s.name, MAX_NAME, stdin);
+            s.name[strcspn(s.name, "\n")] = '\0'; break;
+        case 2:
+            printf("  New Department: "); fgets(s.department, MAX_DEPT, stdin);
+            s.department[strcspn(s.department, "\n")] = '\0'; break;
+        case 3:
+            do {
+                printf("  New Semester (1-8): ");
+                scanf("%d", &s.semester); flush_input();
+            } while (!validate_semester(s.semester));
+            break;
+        case 4:
+            do {
+                printf("  New CGPA (0-10): ");
+                scanf("%f", &s.cgpa); flush_input();
+            } while (!validate_cgpa(s.cgpa));
+            break;
+        case 5:
+            printf("  New Phone: "); fgets(s.phone, MAX_PHONE, stdin);
+            s.phone[strcspn(s.phone, "\n")] = '\0'; break;
+        case 6:
+            printf("  New Email: "); fgets(s.email, MAX_EMAIL, stdin);
+            s.email[strcspn(s.email, "\n")] = '\0'; break;
+        case 7:
+            printf("  New Name: "); fgets(s.name, MAX_NAME, stdin);
+            s.name[strcspn(s.name, "\n")] = '\0';
+            printf("  New Department: "); fgets(s.department, MAX_DEPT, stdin);
+            s.department[strcspn(s.department, "\n")] = '\0';
+            do { printf("  New Semester: "); scanf("%d",&s.semester); flush_input(); }
+            while(!validate_semester(s.semester));
+            do { printf("  New CGPA: "); scanf("%f",&s.cgpa); flush_input(); }
+            while(!validate_cgpa(s.cgpa));
+            printf("  New Phone: "); fgets(s.phone, MAX_PHONE, stdin);
+            s.phone[strcspn(s.phone, "\n")] = '\0';
+            printf("  New Email: "); fgets(s.email, MAX_EMAIL, stdin);
+            s.email[strcspn(s.email, "\n")] = '\0';
+            break;
+        default: fclose(fp); return;
+    }
+ 
+    fseek(fp, pos, SEEK_SET);
+    fwrite(&s, sizeof(Student), 1, fp);
+    fclose(fp);
+    printf(GREEN BOLD "\n  ✔ Record updated successfully!\n" RESET);
+ 
+wait:
+    printf("\n  Press Enter to continue...");
+    flush_input();
+}
+ 
+/* ═══════════════════════════════════════════════════════════
+   5. DELETE STUDENT
+═══════════════════════════════════════════════════════════ */
+void delete_student(void) {
+    clear_screen();
+    print_separator("DELETE STUDENT RECORD", '=', 62);
+ 
+    int roll;
+    printf("\n  Enter Roll Number to delete: ");
+    if (scanf("%d", &roll) != 1) { flush_input(); return; }
+    flush_input();
+ 
+    FILE *fp = fopen(FILE_NAME, "rb");
+    if (!fp) { printf(YELLOW "\n  ⚠ No records found.\n" RESET); goto wait; }
+ 
+    Student arr[MAX_STUDENTS];
+    int count = 0, found = 0;
+    while (fread(&arr[count], sizeof(Student), 1, fp) == 1) {
+        if (arr[count].roll_no == roll) found = 1;
+        else count++;
+    }
+    fclose(fp);
+ 
+    if (!found) { printf(YELLOW "\n  ⚠ Roll No. %d not found.\n" RESET, roll); goto wait; }
+ 
+    printf(RED "\n  ⚠ Confirm delete Roll No. %d? (y/N): " RESET, roll);
+    char c = (char)getchar(); flush_input();
+    if (c != 'y' && c != 'Y') { printf("  Cancelled.\n"); goto wait; }
+ 
+    FILE *fp2 = fopen(FILE_NAME, "wb");
+    if (!fp2) { printf(RED "  ✗ File write error!\n" RESET); goto wait; }
+    for (int i = 0; i < count; i++) fwrite(&arr[i], sizeof(Student), 1, fp2);
+    fclose(fp2);
+    printf(GREEN BOLD "\n  ✔ Record deleted. Remaining: %d\n" RESET, count);
+ 
+wait:
+    printf("\n  Press Enter to continue...");
+    flush_input();
+}
+ 
+/* ═══════════════════════════════════════════════════════════
+   6. STATISTICS
+═══════════════════════════════════════════════════════════ */
+void display_statistics(void) {
+    clear_screen();
+    print_separator("STATISTICS & ANALYTICS", '=', 62);
+ 
+    FILE *fp = fopen(FILE_NAME, "rb");
+    if (!fp) { printf(YELLOW "\n  ⚠ No data available.\n" RESET); goto wait; }
+ 
+    Student s, top, low_s;
+    int total = 0, sem_count[9] = {0};
+    float sum = 0, max_cgpa = -1, min_cgpa = 11;
+    int above9 = 0, above75 = 0, below6 = 0;
+ 
+    while (fread(&s, sizeof(Student), 1, fp) == 1) {
+        total++;
+        sum += s.cgpa;
+        if (s.cgpa > max_cgpa) { max_cgpa = s.cgpa; top = s; }
+        if (s.cgpa < min_cgpa) { min_cgpa = s.cgpa; low_s = s; }
+        if (s.semester >= 1 && s.semester <= 8) sem_count[s.semester]++;
+        if (s.cgpa >= 9.0f) above9++;
+        if (s.cgpa >= 7.5f && s.cgpa < 9.0f) above75++;
+        if (s.cgpa < 6.0f) below6++;
+    }
+    fclose(fp);
+ 
+    if (total == 0) { printf(YELLOW "\n  No records.\n" RESET); goto wait; }
+ 
+    float avg = sum / total;
+ 
+    printf(CYAN "\n  ┌──────────────────────────────────────────┐\n");
+    printf("  │" BOLD YELLOW "          OVERALL SUMMARY                 " CYAN "│\n");
+    printf("  ├──────────────────────────────────────────┤\n");
+    printf("  │" RESET "  Total Students   : " BOLD "%-5d" RESET "                   " CYAN "│\n", total);
+    printf("  │" RESET "  Average CGPA     : " GREEN BOLD "%-6.2f" RESET "                  " CYAN "│\n", avg);
+    printf("  │" RESET "  Highest CGPA     : " GREEN BOLD "%.2f" RESET " (%s)%*s " CYAN "│\n",
+           max_cgpa, top.name, (int)(20 - strlen(top.name)), "");
+    printf("  │" RESET "  Lowest  CGPA     : " RED BOLD "%.2f" RESET " (%s)%*s " CYAN "│\n",
+           min_cgpa, low_s.name, (int)(20 - strlen(low_s.name)), "");
+    printf("  ├──────────────────────────────────────────┤\n");
+    printf("  │" BOLD YELLOW "          CGPA DISTRIBUTION               " CYAN "│\n");
+    printf("  ├──────────────────────────────────────────┤\n");
+    printf("  │" RESET "  9.0 – 10.0 (O)   : " GREEN BOLD "%-4d" RESET " students            " CYAN "│\n", above9);
+    printf("  │" RESET "  7.5 – 8.9  (A+)  : " GREEN BOLD "%-4d" RESET " students            " CYAN "│\n", above75);
+    printf("  │" RESET "  Below 6.0  (C)   : " RED   BOLD "%-4d" RESET " students            " CYAN "│\n", below6);
+    printf("  ├──────────────────────────────────────────┤\n");
+    printf("  │" BOLD YELLOW "          SEMESTER DISTRIBUTION           " CYAN "│\n");
+    printf("  ├──────────────────────────────────────────┤\n");
+ 
+    for (int i = 1; i <= 8; i++) {
+        if (sem_count[i] == 0) continue;
+        int bar = (sem_count[i] * 20) / total;
+        printf("  │" RESET "  Sem %d: [" GREEN, i);
+        for (int j = 0; j < bar; j++) printf("█");
+        printf(RESET);
+        for (int j = bar; j < 20; j++) printf("░");
+        printf("] %d%*s" CYAN "│\n", sem_count[i], (int)(6 - (sem_count[i] > 9 ? 2 : 1)), "");
+    }
+    printf("  └──────────────────────────────────────────┘\n" RESET);
+ 
+wait:
+    printf("\n  Press Enter to continue...");
+    flush_input();
+}
+ 
+/* ═══════════════════════════════════════════════════════════
+   7. SORT & DISPLAY
+═══════════════════════════════════════════════════════════ */
+int cmp_cgpa_desc(const void *a, const void *b) {
+    float fa = ((Student*)a)->cgpa, fb = ((Student*)b)->cgpa;
+    return (fa < fb) - (fa > fb);
+}
+int cmp_name_asc(const void *a, const void *b) {
+    return strcmp(((Student*)a)->name, ((Student*)b)->name);
+}
+int cmp_roll_asc(const void *a, const void *b) {
+    return ((Student*)a)->roll_no - ((Student*)b)->roll_no;
+}
+ 
+void sort_and_display(void) {
+    clear_screen();
+    print_separator("SORT & DISPLAY", '=', 62);
+    printf("\n  Sort by:\n");
+    printf("  " GREEN "1." RESET " CGPA (High → Low)\n");
+    printf("  " GREEN "2." RESET " Name (A → Z)\n");
+    printf("  " GREEN "3." RESET " Roll Number\n");
+    printf("  Choice: ");
+ 
+    int ch;
+    if (scanf("%d", &ch) != 1) { flush_input(); return; }
+    flush_input();
+ 
+    FILE *fp = fopen(FILE_NAME, "rb");
+    if (!fp) { printf(YELLOW "\n  ⚠ No records.\n" RESET); goto wait; }
+ 
+    Student arr[MAX_STUDENTS];
+    int n = 0;
+    while (fread(&arr[n], sizeof(Student), 1, fp) == 1 && n < MAX_STUDENTS) n++;
+    fclose(fp);
+ 
+    if (n == 0) { printf(YELLOW "\n  No data.\n" RESET); goto wait; }
+ 
+    if      (ch == 1) qsort(arr, n, sizeof(Student), cmp_cgpa_desc);
+    else if (ch == 2) qsort(arr, n, sizeof(Student), cmp_name_asc);
+    else if (ch == 3) qsort(arr, n, sizeof(Student), cmp_roll_asc);
+ 
+    print_student_header();
+    for (int i = 0; i < n; i++) print_student_row(&arr[i], i + 1);
+    printf(CYAN "└──────┴──────────────────────────┴────────────────┴──────┴──────┴─────────────┘\n" RESET);
+    printf(GREEN "\n  Showing %d records.\n" RESET, n);
+ 
+wait:
+    printf("\n  Press Enter to continue...");
+    flush_input();
+}
+ 
+/* ═══════════════════════════════════════════════════════════
+   8. EXPORT REPORT
+═══════════════════════════════════════════════════════════ */
+void export_report(void) {
+    FILE *in = fopen(FILE_NAME, "rb");
+    if (!in) { printf(YELLOW "\n  ⚠ No records to export.\n" RESET); return; }
+ 
+    FILE *out = fopen("student_report.txt", "w");
+    if (!out) { printf(RED "\n  ✗ Cannot create report file.\n" RESET); fclose(in); return; }
+ 
+    fprintf(out, "=============================================================\n");
+    fprintf(out, "          STUDENT MANAGEMENT SYSTEM — EXPORT REPORT\n");
+    fprintf(out, "=============================================================\n\n");
+    fprintf(out, "%-6s %-25s %-15s %-5s %-6s %-15s\n",
+            "Roll", "Name", "Department", "Sem", "CGPA", "Phone");
+    fprintf(out, "-------------------------------------------------------------\n");
+ 
+    Student s;
+    int count = 0;
+    float total_cgpa = 0;
+    while (fread(&s, sizeof(Student), 1, in) == 1) {
+        count++;
+        total_cgpa += s.cgpa;
+        fprintf(out, "%-6d %-25s %-15s %-5d %-6.2f %-15s\n",
+                s.roll_no, s.name, s.department, s.semester, s.cgpa, s.phone);
+    }
+    fprintf(out, "\n-------------------------------------------------------------\n");
+    fprintf(out, "Total Students: %d    Average CGPA: %.2f\n",
+            count, count > 0 ? total_cgpa / count : 0.0f);
+    fprintf(out, "=============================================================\n");
+ 
+    fclose(in);
+    fclose(out);
+    printf(GREEN BOLD "\n  ✔ Report exported to 'student_report.txt' (%d records)\n" RESET, count);
+    printf("\n  Press Enter to continue...");
+    flush_input();
+}
+ 
+/* ═══════════════════════════════════════════════════════════
+   MAIN
+═══════════════════════════════════════════════════════════ */
+int main(void) {
+    int choice;
+ 
+    print_banner();
+    printf("\n" DIM "  Press Enter to continue..." RESET);
+    flush_input();
+ 
+    do {
+        print_banner();
+        print_menu();
+ 
+        if (scanf("%d", &choice) != 1) { flush_input(); choice = -1; continue; }
+        flush_input();
+ 
+        switch (choice) {
+            case 1: add_student();        break;
+            case 2: display_all();        break;
+            case 3: search_student();     break;
+            case 4: update_student();     break;
+            case 5: delete_student();     break;
+            case 6: display_statistics(); break;
+            case 7: sort_and_display();   break;
+            case 8: export_report();      break;
+            case 0:
+                clear_screen();
+                printf(CYAN BOLD "\n  👋 Thank you for using Student Management System!\n" RESET);
+                printf(DIM "  Data saved to: %s\n\n" RESET, FILE_NAME);
+                break;
+            default:
+                printf(RED "\n  ✗ Invalid option. Try 0–8.\n" RESET);
+                printf("  Press Enter..."); flush_input();
+        }
+    } while (choice != 0);
+ 
+    return 0;
+}
