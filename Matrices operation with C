@@ -1,0 +1,435 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+ 
+/* ── Constants ─────────────────────────────────────────────── */
+#define MAX   10
+#define VER   "v1.0"
+ 
+/* ── ANSI Escape Codes ─────────────────────────────────────── */
+#define RST   "\033[0m"
+#define BOLD  "\033[1m"
+#define DIM   "\033[2m"
+#define RED   "\033[91m"
+#define GRN   "\033[92m"
+#define YLW   "\033[93m"
+#define BLU   "\033[94m"
+#define MAG   "\033[95m"
+#define CYN   "\033[96m"
+#define WHT   "\033[97m"
+#define BGBLK "\033[40m"
+ 
+/* ═══════════════════════════════════════════════════════════════
+   UTILITY
+═══════════════════════════════════════════════════════════════ */
+ 
+void clear_screen(void) {
+#ifdef _WIN32
+    system("cls");
+#else
+    system("clear");
+#endif
+}
+ 
+void flush_input(void) {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+}
+ 
+void print_banner(void) {
+    clear_screen();
+    printf("\n" CYN BOLD);
+    printf("  ╔══════════════════════════════════════════════════════════╗\n");
+    printf("  ║                                                          ║\n");
+    printf("  ║   " YLW "███╗   ███╗ █████╗ ████████╗██████╗ ██╗██╗  ██╗" CYN "     ║\n");
+    printf("  ║   " YLW "████╗ ████║██╔══██╗╚══██╔══╝██╔══██╗██║╚██╗██╔╝" CYN "     ║\n");
+    printf("  ║   " YLW "██╔████╔██║███████║   ██║   ██████╔╝██║ ╚███╔╝ " CYN "     ║\n");
+    printf("  ║   " YLW "██║╚██╔╝██║██╔══██║   ██║   ██╔══██╗██║ ██╔██╗ " CYN "     ║\n");
+    printf("  ║   " YLW "██║ ╚═╝ ██║██║  ██║   ██║   ██║  ██║██║██╔╝ ██╗" CYN "     ║\n");
+    printf("  ║   " YLW "╚═╝     ╚═╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚═╝╚═╝  ╚═╝" CYN "    ║\n");
+    printf("  ║                  " MAG "OPERATIONS ENGINE" CYN "  " DIM WHT VER CYN "              ║\n");
+    printf("  ╚══════════════════════════════════════════════════════════╝\n" RST);
+}
+ 
+void print_menu(void) {
+    printf("\n");
+    printf(CYN "  ┌──────────────────────────────────────────────┐\n");
+    printf("  │" BOLD YLW "          MAIN  MENU                          " CYN "│\n");
+    printf("  ├──────────────────────────────────────────────┤\n");
+    printf("  │  " GRN "1." RST "  ➕  Matrix Addition  (A + B)           " CYN "│\n");
+    printf("  │  " GRN "2." RST "  ✖️   Matrix Multiplication (A × B)      " CYN "│\n");
+    printf("  │  " GRN "3." RST "  ↗️   Matrix Transpose  (Aᵀ)             " CYN "│\n");
+    printf("  │  " GRN "4." RST "  🔢  Scalar Multiplication (k × A)      " CYN "│\n");
+    printf("  │  " GRN "5." RST "  📐  Matrix Determinant (det A)         " CYN "│\n");
+    printf("  │  " GRN "6." RST "  💡  Demo with Sample Matrices          " CYN "│\n");
+    printf("  ├──────────────────────────────────────────────┤\n");
+    printf("  │  " RED "0." RST "  🚪  Exit                               " CYN "│\n");
+    printf("  └──────────────────────────────────────────────┘\n" RST);
+    printf(BOLD "  Enter choice: " RST);
+}
+ 
+/* ═══════════════════════════════════════════════════════════════
+   MATRIX DISPLAY
+═══════════════════════════════════════════════════════════════ */
+ 
+void print_matrix(const char *label, double mat[MAX][MAX], int rows, int cols) {
+    printf("\n" BOLD CYN "  %s" RST " [%d × %d]\n", label, rows, cols);
+    printf(CYN "  ┌");
+    for (int j = 0; j < cols; j++) printf("──────────");
+    printf("─┐\n" RST);
+ 
+    for (int i = 0; i < rows; i++) {
+        printf(CYN "  │" RST);
+        for (int j = 0; j < cols; j++) {
+            double v = mat[i][j];
+            if (v < 0)
+                printf(RED "  %7.2f " RST, v);
+            else if (v == 0)
+                printf(DIM "  %7.2f " RST, v);
+            else
+                printf(GRN "  %7.2f " RST, v);
+        }
+        printf(CYN "│\n" RST);
+    }
+ 
+    printf(CYN "  └");
+    for (int j = 0; j < cols; j++) printf("──────────");
+    printf("─┘\n" RST);
+}
+ 
+/* ═══════════════════════════════════════════════════════════════
+   INPUT
+═══════════════════════════════════════════════════════════════ */
+ 
+void input_matrix(const char *name, double mat[MAX][MAX], int rows, int cols) {
+    printf(YLW "\n  Enter elements of %s [%d × %d]:\n" RST, name, rows, cols);
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            printf(CYN "  [%d][%d] = " RST, i, j);
+            while (scanf("%lf", &mat[i][j]) != 1) {
+                printf(RED "  ✗ Invalid. Re-enter: " RST);
+                flush_input();
+            }
+        }
+    }
+    flush_input();
+}
+ 
+int input_dimensions(const char *prompt, int *r, int *c) {
+    printf(YLW "\n  %s\n" RST, prompt);
+    printf(CYN "  Rows (1-%d): " RST, MAX);
+    if (scanf("%d", r) != 1 || *r < 1 || *r > MAX) {
+        flush_input();
+        printf(RED "  ✗ Invalid rows.\n" RST);
+        return 0;
+    }
+    printf(CYN "  Cols (1-%d): " RST, MAX);
+    if (scanf("%d", c) != 1 || *c < 1 || *c > MAX) {
+        flush_input();
+        printf(RED "  ✗ Invalid cols.\n" RST);
+        return 0;
+    }
+    flush_input();
+    return 1;
+}
+ 
+/* ═══════════════════════════════════════════════════════════════
+   CORE OPERATIONS — MODULAR FUNCTIONS
+═══════════════════════════════════════════════════════════════ */
+ 
+/*
+ * add_matrices()
+ * Adds two matrices A and B of same dimensions.
+ * Result[i][j] = A[i][j] + B[i][j]
+ */
+void add_matrices(double A[MAX][MAX], double B[MAX][MAX],
+                  double R[MAX][MAX], int rows, int cols) {
+    for (int i = 0; i < rows; i++)
+        for (int j = 0; j < cols; j++)
+            R[i][j] = A[i][j] + B[i][j];
+}
+ 
+/*
+ * multiply_matrices()
+ * Multiplies A [rA × cA] by B [cA × cB].
+ * R[i][j] = Σ A[i][k] * B[k][j]
+ */
+void multiply_matrices(double A[MAX][MAX], double B[MAX][MAX],
+                       double R[MAX][MAX], int rA, int cA, int cB) {
+    /* Zero out result */
+    for (int i = 0; i < rA; i++)
+        for (int j = 0; j < cB; j++)
+            R[i][j] = 0.0;
+ 
+    for (int i = 0; i < rA; i++)
+        for (int j = 0; j < cB; j++)
+            for (int k = 0; k < cA; k++)
+                R[i][j] += A[i][k] * B[k][j];
+}
+ 
+/*
+ * transpose_matrix()
+ * Transposes A [rows × cols] → T [cols × rows].
+ * T[j][i] = A[i][j]
+ */
+void transpose_matrix(double A[MAX][MAX], double T[MAX][MAX],
+                      int rows, int cols) {
+    for (int i = 0; i < rows; i++)
+        for (int j = 0; j < cols; j++)
+            T[j][i] = A[i][j];
+}
+ 
+/*
+ * scalar_multiply()
+ * Multiplies every element of A by scalar k.
+ */
+void scalar_multiply(double A[MAX][MAX], double R[MAX][MAX],
+                     int rows, int cols, double k) {
+    for (int i = 0; i < rows; i++)
+        for (int j = 0; j < cols; j++)
+            R[i][j] = A[i][j] * k;
+}
+ 
+/*
+ * determinant()
+ * Computes det(A) for an n×n matrix via cofactor expansion.
+ * Recursive implementation.
+ */
+double determinant(double A[MAX][MAX], int n) {
+    if (n == 1) return A[0][0];
+    if (n == 2) return A[0][0]*A[1][1] - A[0][1]*A[1][0];
+ 
+    double det = 0.0;
+    double sub[MAX][MAX];
+    int sign = 1;
+ 
+    for (int f = 0; f < n; f++) {
+        /* Build sub-matrix excluding row 0 and col f */
+        int si = 0;
+        for (int i = 1; i < n; i++) {
+            int sj = 0;
+            for (int j = 0; j < n; j++) {
+                if (j == f) continue;
+                sub[si][sj++] = A[i][j];
+            }
+            si++;
+        }
+        det += sign * A[0][f] * determinant(sub, n - 1);
+        sign = -sign;
+    }
+    return det;
+}
+ 
+/* ═══════════════════════════════════════════════════════════════
+   MENU HANDLERS
+═══════════════════════════════════════════════════════════════ */
+ 
+void op_addition(void) {
+    printf(BOLD MAG "\n  ── MATRIX ADDITION ──────────────────────────\n" RST);
+    printf(DIM "  Formula: R[i][j] = A[i][j] + B[i][j]\n" RST);
+ 
+    int r, c;
+    if (!input_dimensions("Dimensions of A and B (must be equal):", &r, &c)) return;
+ 
+    double A[MAX][MAX], B[MAX][MAX], R[MAX][MAX];
+    input_matrix("Matrix A", A, r, c);
+    input_matrix("Matrix B", B, r, c);
+ 
+    add_matrices(A, B, R, r, c);
+ 
+    print_matrix("Matrix A", A, r, c);
+    printf(BOLD "  +\n");
+    print_matrix("Matrix B", B, r, c);
+    printf(BOLD GRN "  = Result\n" RST);
+    print_matrix("A + B", R, r, c);
+ 
+    printf(GRN BOLD "\n  ✔ Addition complete!\n" RST);
+}
+ 
+void op_multiplication(void) {
+    printf(BOLD MAG "\n  ── MATRIX MULTIPLICATION ────────────────────\n" RST);
+    printf(DIM "  Formula: R[i][j] = Σ A[i][k] * B[k][j]\n" RST);
+    printf(DIM "  Requirement: cols(A) == rows(B)\n" RST);
+ 
+    int rA, cA, rB, cB;
+    printf(YLW "\n  Dimensions of A:\n" RST);
+    printf(CYN "  Rows: " RST); scanf("%d", &rA); flush_input();
+    printf(CYN "  Cols: " RST); scanf("%d", &cA); flush_input();
+ 
+    printf(YLW "\n  Dimensions of B:\n" RST);
+    printf(CYN "  Rows: " RST); scanf("%d", &rB); flush_input();
+    printf(CYN "  Cols: " RST); scanf("%d", &cB); flush_input();
+ 
+    if (cA != rB) {
+        printf(RED "\n  ✗ Incompatible! cols(A)=%d ≠ rows(B)=%d\n" RST, cA, rB);
+        printf("  Press Enter..."); flush_input(); return;
+    }
+    if (rA<1||rA>MAX||cA<1||cA>MAX||cB<1||cB>MAX) {
+        printf(RED "\n  ✗ Dimensions out of range (1-%d).\n" RST, MAX);
+        printf("  Press Enter..."); flush_input(); return;
+    }
+ 
+    double A[MAX][MAX], B[MAX][MAX], R[MAX][MAX];
+    input_matrix("Matrix A", A, rA, cA);
+    input_matrix("Matrix B", B, rB, cB);
+ 
+    multiply_matrices(A, B, R, rA, cA, cB);
+ 
+    print_matrix("Matrix A", A, rA, cA);
+    printf(BOLD "  ×\n");
+    print_matrix("Matrix B", B, rB, cB);
+    printf(BOLD GRN "  = Result [%d × %d]\n" RST, rA, cB);
+    print_matrix("A × B", R, rA, cB);
+ 
+    printf(GRN BOLD "\n  ✔ Multiplication complete!\n" RST);
+}
+ 
+void op_transpose(void) {
+    printf(BOLD MAG "\n  ── MATRIX TRANSPOSE ─────────────────────────\n" RST);
+    printf(DIM "  Formula: T[j][i] = A[i][j]\n" RST);
+ 
+    int r, c;
+    if (!input_dimensions("Dimensions of A:", &r, &c)) return;
+ 
+    double A[MAX][MAX], T[MAX][MAX];
+    input_matrix("Matrix A", A, r, c);
+    transpose_matrix(A, T, r, c);
+ 
+    print_matrix("Matrix A", A, r, c);
+    printf(BOLD GRN "  ᵀ Result [%d × %d]\n" RST, c, r);
+    print_matrix("Aᵀ (Transpose)", T, c, r);
+ 
+    printf(GRN BOLD "\n  ✔ Transpose complete!\n" RST);
+}
+ 
+void op_scalar(void) {
+    printf(BOLD MAG "\n  ── SCALAR MULTIPLICATION ────────────────────\n" RST);
+    printf(DIM "  Formula: R[i][j] = k * A[i][j]\n" RST);
+ 
+    int r, c;
+    if (!input_dimensions("Dimensions of A:", &r, &c)) return;
+ 
+    double A[MAX][MAX], R[MAX][MAX];
+    input_matrix("Matrix A", A, r, c);
+ 
+    double k;
+    printf(CYN "\n  Scalar k = " RST);
+    while (scanf("%lf", &k) != 1) { flush_input(); printf(RED "  Re-enter: " RST); }
+    flush_input();
+ 
+    scalar_multiply(A, R, r, c, k);
+ 
+    print_matrix("Matrix A", A, r, c);
+    printf(BOLD "  k = %.4g\n", k);
+    print_matrix("k × A", R, r, c);
+ 
+    printf(GRN BOLD "\n  ✔ Scalar multiplication complete!\n" RST);
+}
+ 
+void op_determinant(void) {
+    printf(BOLD MAG "\n  ── MATRIX DETERMINANT ───────────────────────\n" RST);
+    printf(DIM "  Recursive cofactor expansion\n" RST);
+ 
+    int n;
+    printf(CYN "\n  Square matrix size n (1-%d): " RST, MAX);
+    if (scanf("%d", &n) != 1 || n < 1 || n > MAX) {
+        flush_input(); printf(RED "  ✗ Invalid.\n" RST); return;
+    }
+    flush_input();
+ 
+    double A[MAX][MAX];
+    input_matrix("Matrix A", A, n, n);
+ 
+    double det = determinant(A, n);
+ 
+    print_matrix("Matrix A", A, n, n);
+    printf(BOLD YLW "\n  det(A) = " GRN "%.6g" RST "\n", det);
+ 
+    if (det != 0.0)
+        printf(GRN "  ✔ Matrix is invertible (det ≠ 0)\n" RST);
+    else
+        printf(YLW "  ⚠ Matrix is singular (det = 0, not invertible)\n" RST);
+}
+ 
+void op_demo(void) {
+    printf(BOLD MAG "\n  ── DEMO: SAMPLE 3×3 MATRICES ───────────────\n" RST);
+ 
+    double A[MAX][MAX] = {
+        {1, 2, 3},
+        {4, 5, 6},
+        {7, 8, 9}
+    };
+    double B[MAX][MAX] = {
+        {9, 8, 7},
+        {6, 5, 4},
+        {3, 2, 1}
+    };
+    double R[MAX][MAX], T[MAX][MAX];
+    int n = 3;
+ 
+    printf(YLW "\n  Demo matrices (3×3):\n" RST);
+    print_matrix("Matrix A", A, n, n);
+    print_matrix("Matrix B", B, n, n);
+ 
+    printf(BOLD "\n  1) A + B\n" RST);
+    add_matrices(A, B, R, n, n);
+    print_matrix("A + B", R, n, n);
+ 
+    printf(BOLD "\n  2) A × B\n" RST);
+    multiply_matrices(A, B, R, n, n, n);
+    print_matrix("A × B", R, n, n);
+ 
+    printf(BOLD "\n  3) Aᵀ\n" RST);
+    transpose_matrix(A, T, n, n);
+    print_matrix("Aᵀ", T, n, n);
+ 
+    printf(BOLD "\n  4) det(A) = " GRN "%.6g" RST "\n", determinant(A, n));
+    printf(BOLD "\n  5) 2 × A\n" RST);
+    scalar_multiply(A, R, n, n, 2.0);
+    print_matrix("2A", R, n, n);
+ 
+    printf(GRN BOLD "\n  ✔ Demo complete!\n" RST);
+}
+ 
+/* ═══════════════════════════════════════════════════════════════
+   MAIN
+═══════════════════════════════════════════════════════════════ */
+ 
+int main(void) {
+    int choice;
+ 
+    print_banner();
+    printf("\n" DIM "  Press Enter to continue..." RST);
+    flush_input();
+ 
+    do {
+        print_banner();
+        print_menu();
+ 
+        if (scanf("%d", &choice) != 1) { flush_input(); choice = -1; continue; }
+        flush_input();
+ 
+        switch (choice) {
+            case 1: op_addition();       break;
+            case 2: op_multiplication(); break;
+            case 3: op_transpose();      break;
+            case 4: op_scalar();         break;
+            case 5: op_determinant();    break;
+            case 6: op_demo();           break;
+            case 0:
+                printf(CYN BOLD "\n  👋 Exiting Matrix Operations Engine.\n\n" RST);
+                break;
+            default:
+                printf(RED "\n  ✗ Invalid option. Choose 0–6.\n" RST);
+        }
+ 
+        if (choice != 0) {
+            printf("\n" DIM "  Press Enter to return to menu..." RST);
+            flush_input();
+        }
+ 
+    } while (choice != 0);
+ 
+    return 0;
+}
